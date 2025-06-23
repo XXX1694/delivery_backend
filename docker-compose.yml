@@ -1,60 +1,64 @@
-version: '3.8'
-
 services:
-  # Сервис базы данных PostgreSQL
   db:
-    image: postgres:15-alpine # Используем легковесный образ PostgreSQL
+    image: postgres:15-alpine
     container_name: jibekjoly_db
     volumes:
-      - postgres_data:/var/lib/postgresql/data/ # Сохраняем данные БД между перезапусками
+      - postgres_data:/var/lib/postgresql/data/
     env_file:
-      - ./.env # Берем переменные (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB) из .env файла
+      - ./.env
     expose:
       - 5432
     restart: unless-stopped
 
-  # Сервис Redis для кэша или Celery (если понадобится в будущем)
   redis:
     image: redis:7-alpine
     container_name: jibekjoly_redis
     restart: unless-stopped
 
-  # Сервис нашего Django-приложения
   app:
-    build: nginx # Собираем образ из Dockerfile в текущей директории
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: jibekjoly_app
     volumes:
-      - .:/app # Монтируем код проекта внутрь контейнера (удобно для разработки)
-      - static_volume:/app/staticfiles # "Делимся" этой папкой с Nginx
-      - media_volume:/app/media # "Делимся" этой папкой с Nginx
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             gunicorn jibekjoly_backend.wsgi:application --bind 0.0.0.0:8000"
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
     expose:
       - 8000
     env_file:
-      - ./.env # Берем переменные (SECRET_KEY, DATABASE_URL и т.д.) из .env файла
-    depends_on: # Запускаем только после того, как запустятся db и redis
+      - ./.env
+    depends_on:
       - db
       - redis
     restart: unless-stopped
 
-  # Сервис веб-сервера Nginx
   nginx:
     image: nginx:1.25-alpine
     container_name: jibekjoly_nginx
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf # Подключаем нашу конфигурацию
-      - static_volume:/app/staticfiles # Получаем доступ к статике от Django-приложения
-      - media_volume:/app/media # Получаем доступ к медиа от Django-приложения
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
     ports:
-      - "80:80" # Пробрасываем порт 80 с сервера на порт 80 в контейнере
+      - "80:80"
+      - "443:443"
     depends_on:
       - app
     restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    container_name: jibekjoly_certbot
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
 
 volumes:
   postgres_data:
   static_volume:
   media_volume:
+  certbot_conf:
+  certbot_www:

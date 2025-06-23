@@ -173,6 +173,13 @@ class OrderDetailAPIView(generics.RetrieveUpdateAPIView):
 
 
 class AvailableOrderListAPIView(generics.ListAPIView):
+    """
+        Возвращает список доступных заказов для курьеров.
+
+        Эндпоинт для аутентифицированных пользователей с ролью "курьер".
+        Возвращает список заказов, у которых еще не назначен курьер
+        и которые находятся в статусе "Обработка".
+    """
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 

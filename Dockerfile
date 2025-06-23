@@ -1,20 +1,28 @@
 FROM python:3.11-slim-buster
 
-# Устанавливаем переменные окружения
-ENV PYTHONDONTWRITEBYTECODE 1  # Запрещает Python создавать .pyc файлы
-ENV PYTHONUNBUFFERED 1         # Вывод Python будет сразу отправляться в терминал (полезно для логов)
+# Используем современный синтаксис ENV key=value
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Создаем рабочую директорию внутри контейнера
+# Устанавливаем netcat для проверки доступности БД и очищаем кэш apt
+RUN apt-get update && apt-get install -y netcat-traditional && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Обновляем pip
 RUN python -m pip install --upgrade pip
 
-# Копируем файл с зависимостями в контейнер
 COPY requirements.txt .
 
-# Устанавливаем зависимости
 RUN pip install -r requirements.txt
 
-# Копируем весь код проекта в рабочую директорию /app
+# Копируем entrypoint.sh в контейнер
+COPY ./entrypoint.sh /app/entrypoint.sh
+
+# Даем права на выполнение нашему скрипту
+RUN chmod +x /app/entrypoint.sh
+
+# Копируем остальной код проекта
 COPY . .
+
+# Указываем, что при старте контейнера нужно выполнить наш скрипт
+ENTRYPOINT ["/app/entrypoint.sh"]
